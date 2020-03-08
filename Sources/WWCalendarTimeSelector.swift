@@ -170,6 +170,14 @@ import UIKit
             start = end
         }
     }
+    
+    open func isBetween(_ date: Date?) -> Bool {
+        guard let startDate = start,
+              let endDate = end,
+              let date = date else { return false }
+        
+        return (startDate...endDate).contains(date)
+    }
 }
 
 @objc open class WWCalendarTimeSelectorDateRange: NSObject {
@@ -369,7 +377,7 @@ open class WWCalendarTimeSelector: UIViewController, UITableViewDelegate, UITabl
     /// - Note:
     /// Defaults to current date and time, with time rounded off to the nearest hour.
     open var optionCurrentDate = Date().minute < 30 ? Date().beginningOfHour : Date().beginningOfHour + 1.hour
-    
+     
     /// Set the default dates when selector is presented.
     ///
     /// - SeeAlso:
@@ -858,7 +866,8 @@ open class WWCalendarTimeSelector: UIViewController, UITableViewDelegate, UITabl
         clockView.fontColorMinuteHighlight = optionClockFontColorMinuteHighlight
         clockView.backgroundColorMinuteHighlight = optionClockBackgroundColorMinuteHighlight
         clockView.backgroundColorMinuteHighlightNeedle = optionClockBackgroundColorMinuteHighlightNeedle
-        
+        clockView.fontColorHourDisabled = optionClockBackgroundColorFace
+        clockView.fontColorMinuteDisabled = optionClockBackgroundColorFace
         updateDate()
         
         isFirstLoad = true
@@ -2110,6 +2119,12 @@ open class WWCalendarTimeSelector: UIViewController, UITableViewDelegate, UITabl
         updateDate()
         clockView.setNeedsDisplay()
     }
+    
+    internal func WWClockIsTimeEnabled(_ hour: Int, _ minute: Int) -> Bool {
+
+        let date = optionCurrentDate.change(hour: hour, minute: minute, second: 0)
+        return optionRangeOfEnabledDates.isBetween(date)
+    }
 }
 
 @objc internal enum WWCalendarRowType: Int {
@@ -2405,6 +2420,7 @@ internal protocol WWClockProtocol: NSObjectProtocol {
     func WWClockSwitchAMPM(isAM: Bool, isPM: Bool)
     func WWClockSetHourMilitary(_ hour: Int)
     func WWClockSetMinute(_ minute: Int)
+    func WWClockIsTimeEnabled(_ hour: Int, _ minute: Int) -> Bool
 }
 
 internal class WWClock: UIView {
@@ -2421,6 +2437,7 @@ internal class WWClock: UIView {
     internal var fontHourHighlight: UIFont!
     internal var fontColorHour: UIColor!
     internal var fontColorHourHighlight: UIColor!
+    internal var fontColorHourDisabled: UIColor! = .lightGray
     internal var backgroundColorHourHighlight: UIColor!
     internal var backgroundColorHourHighlightNeedle: UIColor!
     internal var fontMinute: UIFont!
@@ -2428,7 +2445,10 @@ internal class WWClock: UIView {
     internal var fontColorMinute: UIColor!
     internal var fontColorMinuteHighlight: UIColor!
     internal var backgroundColorMinuteHighlight: UIColor!
+    internal var fontColorMinuteDisabled: UIColor!
     internal var backgroundColorMinuteHighlightNeedle: UIColor!
+    internal var backgroundColorMinuteDisabled: UIColor!
+    internal var backgroundColorMinuteDisabledNeedle: UIColor!
     
     internal var showingHour = true
     internal var minuteStep: WWCalendarTimeSelectorTimeStep! {
@@ -2506,10 +2526,21 @@ internal class WWClock: UIView {
             
             let degreeIncrement = 360 / CGFloat(hours.count)
             let currentHour = get12Hour(time)
+            let currentMinute = get60Minute(time)
             
             for (index, element) in hours.enumerated() {
                 let angle = getClockRad(CGFloat(index) * degreeIncrement)
+                var hour = element
+                if hour == 12 {
+                    hour = time.hour < 12 ? 0 : 12
+                } else {
+                    hour = time.hour < 12 ? hour : 12 + hour
+                }
+                let isEnabledHour = delegate.WWClockIsTimeEnabled(hour, time.minute)
                 
+                 let notHighlight : [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: fontHour, NSAttributedString.Key.foregroundColor: (isEnabledHour ? fontColorHour : fontColorHourDisabled), NSAttributedString.Key.paragraphStyle: paragraph]
+                
+                let hightlight : [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: fontHourHighlight, NSAttributedString.Key.foregroundColor: (isEnabledHour ? fontColorHourHighlight : fontColorHourDisabled), NSAttributedString.Key.paragraphStyle: paragraph]
                 if element == currentHour {
                     // needle
                     ctx?.saveGState()
@@ -2532,7 +2563,7 @@ internal class WWClock: UIView {
                     ctx?.restoreGState()
                     
                     // numbers
-                    let hour = NSAttributedString(string: "\(element)", attributes: textAttrHighlight)
+                    let hour = NSAttributedString(string: "\(element)", attributes: hightlight)
                     ctx?.saveGState()
                     ctx?.scaleBy(x: -1, y: 1)
                     ctx?.translateBy(x: radiusHighlight * cos(angle), y: -(radiusHighlight * sin(angle)))
@@ -2543,7 +2574,7 @@ internal class WWClock: UIView {
                 }
                 else {
                     // numbers
-                    let hour = NSAttributedString(string: "\(element)", attributes: textAttr)
+                    let hour = NSAttributedString(string: "\(element)", attributes: notHighlight)
                     ctx?.saveGState()
                     ctx?.scaleBy(x: -1, y: 1)
                     ctx?.translateBy(x: radius * cos(angle), y: -(radius * sin(angle)))
@@ -2575,6 +2606,10 @@ internal class WWClock: UIView {
             
             for (index, element) in minutes.enumerated() {
                 let angle = getClockRad(CGFloat(index) * degreeIncrement)
+                let isEnabledMinute = delegate.WWClockIsTimeEnabled(time.hour, element)
+                
+                 let notHightLight : [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: fontMinute, NSAttributedString.Key.foregroundColor: (isEnabledMinute ? fontColorMinute : fontColorMinuteDisabled), NSAttributedString.Key.paragraphStyle: paragraph]
+                let hightlight : [NSAttributedString.Key : Any] = [NSAttributedString.Key.font: fontMinuteHighlight, NSAttributedString.Key.foregroundColor: (isEnabledMinute ? fontColorMinuteHighlight : fontColorMinuteDisabled), NSAttributedString.Key.paragraphStyle: paragraph]
                 
                 if element == currentMinute {
                     // needle
@@ -2609,8 +2644,9 @@ internal class WWClock: UIView {
                     
                     // numbers
                     if minuteStep.rawValue < 5 {
+                        
                         if element % 5 == 0 {
-                            let min = NSAttributedString(string: "\(element)", attributes: textAttrHighlight)
+                            let min = NSAttributedString(string: "\(element)", attributes: hightlight)
                             ctx?.saveGState()
                             ctx?.scaleBy(x: -1, y: 1)
                             ctx?.translateBy(x: radiusHighlight * cos(angle), y: -(radiusHighlight * sin(angle)))
@@ -2621,7 +2657,7 @@ internal class WWClock: UIView {
                         }
                     }
                     else {
-                        let min = NSAttributedString(string: "\(element)", attributes: textAttrHighlight)
+                        let min = NSAttributedString(string: "\(element)", attributes: hightlight)
                         ctx?.saveGState()
                         ctx?.scaleBy(x: -1, y: 1)
                         ctx?.translateBy(x: radiusHighlight * cos(angle), y: -(radiusHighlight * sin(angle)))
@@ -2635,7 +2671,7 @@ internal class WWClock: UIView {
                     // numbers
                     if minuteStep.rawValue < 5 {
                         if element % 5 == 0 {
-                            let min = NSAttributedString(string: "\(element)", attributes: textAttr)
+                            let min = NSAttributedString(string: "\(element)", attributes: notHightLight)
                             ctx?.saveGState()
                             ctx?.scaleBy(x: -1, y: 1)
                             ctx?.translateBy(x: radius * cos(angle), y: -(radius * sin(angle)))
@@ -2646,7 +2682,7 @@ internal class WWClock: UIView {
                         }
                     }
                     else {
-                        let min = NSAttributedString(string: "\(element)", attributes: textAttr)
+                        let min = NSAttributedString(string: "\(element)", attributes: notHightLight)
                         ctx?.saveGState()
                         ctx?.scaleBy(x: -1, y: 1)
                         ctx?.translateBy(x: radius * cos(angle), y: -(radius * sin(angle)))
@@ -2723,13 +2759,17 @@ internal class WWClock: UIView {
                 index = 0
             }
             
-            let hour = hours[index]
+            var hour = hours[index]
             let time = delegate.WWClockGetTime()
             if hour == 12 {
-                delegate.WWClockSetHourMilitary(time.hour < 12 ? 0 : 12)
+                hour = time.hour < 12 ? 0 : 12
+            } else {
+                hour = time.hour < 12 ? hour : 12 + hour
             }
-            else {
-                delegate.WWClockSetHourMilitary(time.hour < 12 ? hour : 12 + hour)
+            let isTimeEnabled = delegate.WWClockIsTimeEnabled(hour, time.minute)
+            
+            if isTimeEnabled {
+                delegate.WWClockSetHourMilitary(hour)
             }
         }
         else {
@@ -2747,7 +2787,11 @@ internal class WWClock: UIView {
             }
             
             let minute = minutes[index]
-            delegate.WWClockSetMinute(minute)
+            let time = delegate.WWClockGetTime()
+            let isTimeEnabled = delegate.WWClockIsTimeEnabled(time.hour, minute)
+            if isTimeEnabled {
+                delegate.WWClockSetMinute(minute)
+            }
         }
     }
 }

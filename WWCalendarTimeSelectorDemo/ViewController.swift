@@ -38,11 +38,15 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let selector = UIStoryboard(name: "WWCalendarTimeSelector", bundle: nil).instantiateInitialViewController() as! WWCalendarTimeSelector
         selector.delegate = self
-        selector.optionCurrentDate = singleDate
+        selector.optionCurrentDate = Date()
         selector.optionCurrentDates = Set(multipleDates)
         selector.optionCurrentDateRange.setStartDate(multipleDates.first ?? singleDate)
         selector.optionCurrentDateRange.setEndDate(multipleDates.last ?? singleDate)
-        
+        let range = WWCalendarTimeSelectorEnabledDateRange()
+        range.setEndDate(Date())
+        range.setStartDate(Date() - 2.day)
+        selector.optionRangeOfEnabledDates = range
+
         switch (indexPath as NSIndexPath).row {
             
         case 0:
