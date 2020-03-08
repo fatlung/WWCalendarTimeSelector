@@ -1887,11 +1887,11 @@ open class WWCalendarTimeSelector: UIViewController, UITableViewDelegate, UITabl
     
     internal func WWCalendarRowDateIsEnable(_ date: Date) -> Bool {
         if let fromDate = optionRangeOfEnabledDates.start,
-            date.compare(fromDate) == .orderedAscending {
+            date.compare(fromDate.beginningOfDay) == .orderedAscending {
             return false
         }
         if let toDate = optionRangeOfEnabledDates.end,
-            date.compare(toDate) == .orderedDescending {
+            date.compare(toDate.endOfDay) == .orderedDescending {
             return false
         }
         return true

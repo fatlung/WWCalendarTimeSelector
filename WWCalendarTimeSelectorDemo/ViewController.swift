@@ -44,7 +44,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         selector.optionCurrentDateRange.setEndDate(multipleDates.last ?? singleDate)
         let range = WWCalendarTimeSelectorEnabledDateRange()
         range.setEndDate(Date())
-        range.setStartDate(Date() - 2.day)
+        range.setStartDate(Date() - 7.day)
         selector.optionRangeOfEnabledDates = range
 
         switch (indexPath as NSIndexPath).row {
